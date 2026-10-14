@@ -24,10 +24,13 @@ local network using the Samsung MDC protocol — no Samsung app, no cloud.
    "Samsung EMDX e-paper"), enter host + PIN, and the MAC address if you want
    Wake-on-LAN.
 3. Push an image — easiest via the bundled dashboard card: add a
-   `custom:emdx-push-card` card (plus a JavaScript resource pointing at
-   `/emdx/card.js`) with an `entity:` of your panel switch; click it, pick
-   an image, and it is downscaled in the browser, uploaded to
-   `/api/emdx/upload` and pushed. Each upload replaces the previous one.
+   `custom:emdx-push-card` card with an `entity:` of your panel switch; click
+   it, pick an image, and it is downscaled in the browser, uploaded to
+   `/api/emdx/upload` and pushed. Each upload replaces the previous one. The
+   card's JavaScript resource (`/emdx/card.js`) is registered automatically
+   when the integration loads — it then works in desktop browsers and in the
+   mobile app. Only if you manage Lovelace resources in YAML
+   (`resource_mode: yaml`) must you add the module resource yourself.
    Or call the service directly:
 
 ```yaml

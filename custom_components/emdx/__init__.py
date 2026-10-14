@@ -27,7 +27,7 @@ from .content_server import ContentServer, build_manifest
 from .coordinator import EmdxCoordinator
 from .image import prepare_image
 from .mdc import MdcAuthError, MdcConnectionError, MdcDevice, MdcError, send_wol
-from .upload import register_views
+from .upload import ensure_card_resource, register_views
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +75,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     server = ContentServer(hass)
     server.start()
     register_views(hass)
+    try:
+        await ensure_card_resource(hass)
+    except Exception:  # noqa: BLE001 — card registration must never fail setup
+        _LOGGER.exception("%s: could not register the push card resource", DOMAIN)
 
     entry.runtime_data = {
         "device": device,

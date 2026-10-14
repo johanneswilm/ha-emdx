@@ -105,6 +105,43 @@ def card_url(hass: HomeAssistant) -> str:
     return f"/emdx/card.js?v={version}"
 
 
+async def ensure_card_resource(hass: HomeAssistant) -> None:
+    """Register the card module as a Lovelace resource (storage mode).
+
+    Resources live in the backend, so this covers desktop browsers and the
+    mobile app alike, and survives dashboard cleanups that drop the card.
+    Idempotent: matches on the URL path and refreshes the ?v= query so
+    browsers refetch after integration upgrades.
+    """
+    lovelace_data = hass.data.get("lovelace")
+    if isinstance(lovelace_data, dict):  # HA < 2024.3 kept a plain dict
+        resources = lovelace_data.get("resources")
+    else:
+        resources = getattr(lovelace_data, "resources", None)
+    if resources is None:
+        _LOGGER.warning("%s: lovelace not set up; push card unavailable", DOMAIN)
+        return
+    if not hasattr(resources, "async_create_item"):
+        # YAML-managed resources (lovelace: resource_mode: yaml) — read-only.
+        _LOGGER.info(
+            "%s: Lovelace resources are YAML-managed; add a module resource"
+            " with url %s to enable the push card",
+            DOMAIN,
+            card_url(hass),
+        )
+        return
+    url = card_url(hass)
+    path = url.split("?", 1)[0]
+    await resources.async_get_info()  # forces storage load before async_items()
+    for item in resources.async_items():
+        if item["url"].split("?", 1)[0] != path:
+            continue
+        if item["url"] != url:
+            await resources.async_update_item(item["id"], {"url": url})
+        return
+    await resources.async_create_item({"res_type": "module", "url": url})
+
+
 def register_views(hass: HomeAssistant) -> None:
     if hass.data[DOMAIN].get("web_ui_registered"):
         return
