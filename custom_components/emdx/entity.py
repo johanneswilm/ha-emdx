@@ -11,6 +11,8 @@ from .coordinator import EmdxCoordinator
 class EmdxEntity:
     """Mixin providing the device entry shared by all entities of one panel."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         entry: ConfigEntry,
