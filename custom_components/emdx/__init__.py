@@ -11,7 +11,6 @@ from homeassistant.const import CONF_HOST, CONF_MAC, CONF_PIN, CONF_URL, Platfor
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
-    ConfigEntryNotReady,
     HomeAssistantError,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -19,8 +18,6 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.selector import TargetSelector, TargetSelectorConfig
 
 from .const import (
-    CONF_CONTENT_PORT,
-    DEFAULT_CONTENT_PORT,
     DOMAIN,
     SERVICE_PUSH_IMAGE,
     SERVICE_SLEEP,
@@ -61,15 +58,12 @@ TARGET_SCHEMA = vol.Schema({vol.Required("target"): _TARGET})
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     host = entry.data[CONF_HOST]
     pin = entry.data[CONF_PIN]
-    port = entry.data.get(CONF_CONTENT_PORT, DEFAULT_CONTENT_PORT)
 
     device = MdcDevice(host, pin)
     coordinator = EmdxCoordinator(hass, device)
-    server = ContentServer(port)
-    try:
-        await server.start()
-    except OSError as err:
-        raise ConfigEntryNotReady(f"EMDX content port {port} unavailable: {err}") from err
+    hass.data.setdefault(DOMAIN, {})
+    server = ContentServer(hass)
+    server.start()
 
     entry.runtime_data = {
         "device": device,
@@ -80,10 +74,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryAuthFailed:
-        await server.stop()
         raise
 
-    hass.data.setdefault(DOMAIN, {})
     if not hass.data[DOMAIN]:
         _register_services(hass)
     hass.data[DOMAIN][entry.entry_id] = entry
@@ -95,7 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload:
-        await entry.runtime_data["server"].stop()
+        entry.runtime_data.pop("server", None)
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
             for svc in (SERVICE_PUSH_IMAGE, SERVICE_WAKE, SERVICE_SLEEP):
@@ -172,9 +164,9 @@ def _register_services(hass: HomeAssistant) -> None:
         )
 
         local_ip = network.async_get_source_ip(hass, entry.data[CONF_HOST])
-        content_url, image_url = server.stage(jpeg, local_ip)
-        commit_manifest = build_manifest(image_url, len(jpeg))
-        server.commit(commit_manifest)
+        content_url = server.stage(jpeg, local_ip, hass.http.server_port)
+        image_url = content_url.removesuffix("/content.json") + "/image"
+        server.commit(content_url, build_manifest(image_url, len(jpeg)))
 
         _LOGGER.info("Pushing image: display will fetch %s", content_url)
         async with coordinator.lock:
@@ -191,7 +183,7 @@ def _register_services(hass: HomeAssistant) -> None:
                     f"Display unreachable (asleep?): {err}"
                 ) from err
 
-        fetched = await server.wait_fetched(timeout=60)
+        fetched = await server.wait_fetched(content_url, timeout=60)
         if not fetched:
             raise HomeAssistantError(
                 "Display did not fetch the image — check it is powered and on "

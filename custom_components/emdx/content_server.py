@@ -1,8 +1,10 @@
-"""Tiny HTTP server the EMDX pulls content.json + image from.
+"""Content endpoints served on Home Assistant's own HTTP port.
 
 The display only speaks the "content download" flow: MDC 0xC7 hands it a URL
-to a manifest, then it GETs the manifest and the image it references. We keep
-exactly one pending push per config entry, guarded by a random token.
+to a manifest, then it GETs the manifest and the image it references. HAOS
+firewalls everything except 8123, so instead of a separate listener we hook
+two unauthenticated views into hass.http. Each push gets a random token that
+both URLs share.
 """
 from __future__ import annotations
 
@@ -13,82 +15,108 @@ import secrets
 import time
 
 from aiohttp import web
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.core import HomeAssistant
+
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 CONTENT_TTL = 600  # seconds a pending push stays fetchable
+URL_PREFIX = "/emdx/c/"
 
 
 class ContentServer:
-    def __init__(self, port: int) -> None:
-        self.port = port
-        self.token = secrets.token_urlsafe(16)
-        self._runner: web.AppRunner | None = None
-        self._pending: dict | None = None
-        self._fetched = asyncio.Event()
-        self._loop = asyncio.get_running_loop()
+    """Pending pushes keyed by token, served under /emdx/c/<token>/."""
 
-    async def start(self) -> None:
-        app = web.Application()
-        app.router.add_get("/c/{token}/content.json", self._handle_manifest)
-        app.router.add_get("/c/{token}/image", self._handle_image)
-        self._runner = web.AppRunner(app, access_log=None)
-        await self._runner.setup()
-        site = web.TCPSite(self._runner, "0.0.0.0", self.port)
-        await site.start()
-        _LOGGER.debug("EMDX content server listening on :%d", self.port)
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+        self._pending: dict[str, dict] = {}
 
-    async def stop(self) -> None:
-        if self._runner is not None:
-            await self._runner.cleanup()
-            self._runner = None
+    def start(self) -> None:
+        if self._hass.data[DOMAIN].get("views_registered"):
+            return
+        self._hass.http.register_view(_ManifestView(self))
+        self._hass.http.register_view(_ImageView(self))
+        self._hass.data[DOMAIN]["views_registered"] = True
 
-    def stage(self, image: bytes, host: str) -> tuple[str, str]:
-        """Stage one push; returns (content_url, image_url) sharing one token."""
-        self.token = secrets.token_urlsafe(16)
-        base = f"http://{host}:{self.port}/c/{self.token}"
+    def stage(self, image: bytes, host: str, port: int) -> str:
+        """Stage one push; returns the content.json URL to hand the display."""
+        now = time.monotonic()
         self._pending = {
+            token: entry
+            for token, entry in self._pending.items()
+            if entry["expires"] > now
+        }
+        token = secrets.token_urlsafe(16)
+        base = f"http://{host}:{port}{URL_PREFIX}{token}"
+        self._pending[token] = {
             "manifest": None,
             "image": image,
-            "expires": time.monotonic() + CONTENT_TTL,
+            "expires": now + CONTENT_TTL,
+            "fetched": asyncio.Event(),
         }
-        self._fetched.clear()
-        return f"{base}/content.json", f"{base}/image"
+        return f"{base}/content.json"
 
-    def commit(self, manifest: dict) -> None:
+    @staticmethod
+    def token_of(content_url: str) -> str:
+        return content_url.split(URL_PREFIX, 1)[1].split("/", 1)[0]
+
+    def commit(self, content_url: str, manifest: dict) -> None:
         """Attach the manifest that references the staged image URL."""
-        if self._pending is not None:
-            self._pending["manifest"] = manifest
+        entry = self._pending.get(self.token_of(content_url))
+        if entry is not None:
+            entry["manifest"] = manifest
 
-    async def wait_fetched(self, timeout: float) -> bool:
+    async def wait_fetched(self, content_url: str, timeout: float) -> bool:
+        entry = self._pending.get(self.token_of(content_url))
+        if entry is None:
+            return False
         try:
-            await asyncio.wait_for(self._fetched.wait(), timeout)
+            await asyncio.wait_for(entry["fetched"].wait(), timeout)
             return True
         except asyncio.TimeoutError:
             return False
 
-    def _valid(self, token: str) -> bool:
-        return (
-            self._pending is not None
-            and token == self.token
-            and self._pending["expires"] > time.monotonic()
-        )
+    def get_pending(self, token: str) -> dict | None:
+        entry = self._pending.get(token)
+        if entry is None or entry["expires"] <= time.monotonic():
+            return None
+        return entry
 
-    async def _handle_manifest(self, request: web.Request) -> web.Response:
-        if not self._valid(request.match_info["token"]) or self._pending["manifest"] is None:
+
+class _ManifestView(HomeAssistantView):
+    url = f"{URL_PREFIX}{{token}}/content.json"
+    name = "emdx:content-manifest"
+    requires_auth = False
+
+    def __init__(self, server: ContentServer) -> None:
+        self._server = server
+
+    async def get(self, request: web.Request, token: str) -> web.Response:
+        entry = self._server.get_pending(token)
+        if entry is None or entry["manifest"] is None:
             return web.Response(status=403)
-        body = json.dumps(self._pending["manifest"]).replace("/", "\\/")
+        body = json.dumps(entry["manifest"]).replace("/", "\\/")
         _LOGGER.info("EMDX fetched content.json")
         return web.Response(text=body, content_type="application/json")
 
-    async def _handle_image(self, request: web.Request) -> web.Response:
-        if not self._valid(request.match_info["token"]):
+
+class _ImageView(HomeAssistantView):
+    url = f"{URL_PREFIX}{{token}}/image"
+    name = "emdx:content-image"
+    requires_auth = False
+
+    def __init__(self, server: ContentServer) -> None:
+        self._server = server
+
+    async def get(self, request: web.Request, token: str) -> web.Response:
+        entry = self._server.get_pending(token)
+        if entry is None:
             return web.Response(status=403)
-        _LOGGER.info("EMDX fetched image (%d bytes)", len(self._pending["image"]))
-        self._loop.call_soon(self._fetched.set)
-        return web.Response(
-            body=self._pending["image"], content_type="image/jpeg"
-        )
+        _LOGGER.info("EMDX fetched image (%d bytes)", len(entry["image"]))
+        entry["fetched"].set()
+        return web.Response(body=entry["image"], content_type="image/jpeg")
 
 
 def build_manifest(image_url: str, image_size: int, *, name: str = "home-assistant") -> dict:

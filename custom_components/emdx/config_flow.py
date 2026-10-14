@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_MAC, CONF_PIN
 from homeassistant.helpers import config_validation as cv
 
-from .const import CONF_CONTENT_PORT, DEFAULT_CONTENT_PORT, DOMAIN
+from .const import DOMAIN
 from .mdc import MdcAuthError, MdcConnectionError, MdcDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,7 +60,6 @@ class EmdxConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_HOST: host,
                         CONF_PIN: pin,
                         CONF_MAC: user_input.get(CONF_MAC),
-                        CONF_CONTENT_PORT: DEFAULT_CONTENT_PORT,
                     },
                 )
         return self.async_show_form(
