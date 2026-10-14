@@ -42,6 +42,7 @@ PUSH_IMAGE_SCHEMA = vol.Schema(
         vol.Exclusive("image", "source"): cv.string,
         vol.Exclusive(CONF_URL, "source"): cv.string,
         vol.Exclusive("camera_entity", "source"): cv.entity_id,
+        vol.Optional("token"): cv.string,
         vol.Optional("resize", default=True): cv.boolean,
         vol.Optional("quality", default=90): vol.All(
             vol.Coerce(int), vol.Range(30, 100)
@@ -165,7 +166,9 @@ def _register_services(hass: HomeAssistant) -> None:
         )
 
         local_ip = network.async_get_source_ip(hass, entry.data[CONF_HOST])
-        content_url = server.stage(jpeg, local_ip, hass.http.server_port)
+        content_url = server.stage(
+            jpeg, local_ip, hass.http.server_port, data.get("token")
+        )
         image_url = content_url.removesuffix("/content.json") + "/image"
         server.commit(content_url, build_manifest(image_url, len(jpeg)))
 
@@ -231,6 +234,17 @@ def _register_services(hass: HomeAssistant) -> None:
         for entry in await _resolve_entries(call):
             await _sleep_entry(hass, entry)
 
+    async def handle_debug_info(call: ServiceCall) -> dict:
+        entry = await _resolve_entries(call)
+        server: ContentServer = entry[0].runtime_data["server"]
+        return {
+            "request_count": server.request_count,
+            "last_content_url": server.last_content_url,
+        }
+
+    hass.services.async_register(
+        DOMAIN, "debug_info", handle_debug_info, TARGET_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_PUSH_IMAGE, handle_push_image, PUSH_IMAGE_SCHEMA
     )
