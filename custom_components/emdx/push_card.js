@@ -1,11 +1,19 @@
 // Lovelace card: pick an image, downscale it in the browser, upload and
 // push it to a Samsung EMDX e-paper panel. Each upload replaces the last.
+//
+// Defensive: setConfig never throws (a missing/renamed entity shows an
+// in-card message instead of Lovelace's "Config error" card), and the
+// upload result is checked for a real JSON response so a proxy/HTML error
+// page cannot crash the card.
 class EmdxPushCard extends HTMLElement {
   setConfig(config) {
-    if (!config.entity) {
-      throw new Error("emdx-push-card: an EMDX panel entity is required");
+    this._config = config || {};
+    if (!this._root) {
+      this._build();
     }
-    this._config = config;
+    if (!this._config.entity) {
+      this._setStatus("No panel entity configured (set entity: switch.samsung_emdx_345r).");
+    }
   }
 
   set hass(hass) {
@@ -17,6 +25,13 @@ class EmdxPushCard extends HTMLElement {
 
   getCardSize() {
     return 4;
+  }
+
+  _setStatus(text, error) {
+    if (this._status) {
+      this._status.textContent = text;
+      this._status.style.color = error ? "var(--error-color)" : "";
+    }
   }
 
   _build() {
@@ -49,6 +64,7 @@ class EmdxPushCard extends HTMLElement {
     body.appendChild(drop);
     card.appendChild(body);
     root.appendChild(card);
+    this._root = root;
     this._status = status;
   }
 
@@ -56,10 +72,14 @@ class EmdxPushCard extends HTMLElement {
     if (!file) {
       return;
     }
-    status.textContent = "Processing…";
+    if (!this._config.entity) {
+      this._setStatus("No panel entity configured.", true);
+      return;
+    }
+    this._setStatus("Processing…");
     try {
       const blob = await this._downscale(file);
-      status.textContent = "Uploading and pushing…";
+      this._setStatus("Uploading and pushing…");
       const url =
         "/api/emdx/upload?entity_id=" +
         encodeURIComponent(this._config.entity);
@@ -68,14 +88,14 @@ class EmdxPushCard extends HTMLElement {
         headers: { "Content-Type": "image/jpeg" },
         body: blob,
       });
-      const data = await resp.json().catch(() => ({}));
-      if (resp.ok) {
-        status.textContent = `Pushed ${(blob.size / 1024).toFixed(0)} kB ✓`;
+      const data = await resp.json().catch(() => null);
+      if (resp.ok && data) {
+        this._setStatus(`Pushed ${(blob.size / 1024).toFixed(0)} kB ✓`);
       } else {
-        status.textContent = data.message || `Error ${resp.status}`;
+        this._setStatus((data && data.message) || `Error ${resp.status}`, true);
       }
     } catch (err) {
-      status.textContent = `Failed: ${err}`;
+      this._setStatus(`Failed: ${err}`, true);
     }
   }
 
