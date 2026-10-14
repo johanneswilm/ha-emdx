@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 import secrets
-import time
+import math
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
@@ -22,7 +22,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-CONTENT_TTL = 600  # seconds a pending push stays fetchable
+CONTENT_TTL = 600  # seconds a superseded push stays fetchable
 URL_PREFIX = "/emdx/c/"
 
 
@@ -44,7 +44,12 @@ class ContentServer:
         self._hass.data[DOMAIN]["views_registered"] = True
 
     def stage(self, image: bytes, host: str, port: int) -> str:
-        """Stage one push; returns the content.json URL to hand the display."""
+        """Stage one push; returns the content.json URL to hand the display.
+
+        The newest content stays fetchable forever: the display keeps the URL
+        and re-fetches it (e.g. after wake); a 404 shows "Configuration error"
+        on the panel. Superseded pushes expire after CONTENT_TTL.
+        """
         now = time.monotonic()
         self._pending = {
             token: entry
@@ -57,7 +62,7 @@ class ContentServer:
         self._pending[token] = {
             "manifest": None,
             "image": image,
-            "expires": now + CONTENT_TTL,
+            "expires": math.inf,
             "fetched": asyncio.Event(),
         }
         return f"{base}/content.json"

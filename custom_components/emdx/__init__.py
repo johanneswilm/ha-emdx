@@ -27,6 +27,7 @@ from .content_server import ContentServer, build_manifest
 from .coordinator import EmdxCoordinator
 from .image import prepare_image
 from .mdc import MdcAuthError, MdcConnectionError, MdcDevice, MdcError, send_wol
+from .upload import register_views
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     server = ContentServer(hass)
     server.start()
+    register_views(hass)
 
     entry.runtime_data = {
         "device": device,
@@ -99,7 +101,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload:
         entry.runtime_data.pop("server", None)
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        if not any(k for k in hass.data[DOMAIN] if k != "services_registered"):
+        _GUARD_KEYS = ("services_registered", "web_ui_registered")
+        if not any(k for k in hass.data[DOMAIN] if k not in _GUARD_KEYS):
             for svc in (SERVICE_PUSH_IMAGE, SERVICE_WAKE, SERVICE_SLEEP):
                 hass.services.async_remove(DOMAIN, svc)
     return unload
