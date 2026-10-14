@@ -36,9 +36,18 @@ _TARGET = TargetSelector(
     TargetSelectorConfig(entity={"integration": DOMAIN})
 )
 
+# Core merges a `target:` kwarg into service_data before validation (script /
+# UI path), so accept both the literal `target` dict (direct REST calls) and
+# the expanded entity_id/device_id/... keys.
+_TARGET_FIELDS: vol.Schema = {
+    vol.Optional("target"): _TARGET,
+    vol.Optional("config_entry_id"): cv.ensure_list(cv.string),
+    **cv.TARGET_SERVICE_FIELDS,
+}
+
 PUSH_IMAGE_SCHEMA = vol.Schema(
     {
-        vol.Required("target"): _TARGET,
+        **_TARGET_FIELDS,
         vol.Exclusive("image", "source"): cv.string,
         vol.Exclusive(CONF_URL, "source"): cv.string,
         vol.Exclusive("camera_entity", "source"): cv.entity_id,
@@ -52,7 +61,7 @@ PUSH_IMAGE_SCHEMA = vol.Schema(
     }
 )
 
-TARGET_SCHEMA = vol.Schema({vol.Required("target"): _TARGET})
+TARGET_SCHEMA = vol.Schema(_TARGET_FIELDS)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -103,6 +112,8 @@ def _register_services(hass: HomeAssistant) -> None:
         registry = er.async_get(hass)
         for key in ("config_entry_id", "entity_id", "device_id"):
             value = target.get(key)
+            if value is None:
+                value = call.data.get(key)
             if value is None:
                 continue
             if isinstance(value, str):
