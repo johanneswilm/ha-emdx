@@ -76,8 +76,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except ConfigEntryAuthFailed:
         raise
 
-    if not hass.data[DOMAIN]:
+    if not hass.data[DOMAIN].get("services_registered"):
         _register_services(hass)
+        hass.data[DOMAIN]["services_registered"] = True
     hass.data[DOMAIN][entry.entry_id] = entry
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -89,7 +90,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload:
         entry.runtime_data.pop("server", None)
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        if not hass.data[DOMAIN]:
+        if not any(k for k in hass.data[DOMAIN] if k != "services_registered"):
             for svc in (SERVICE_PUSH_IMAGE, SERVICE_WAKE, SERVICE_SLEEP):
                 hass.services.async_remove(DOMAIN, svc)
     return unload
