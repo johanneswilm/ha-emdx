@@ -23,7 +23,12 @@ local network using the Samsung MDC protocol — no Samsung app, no cloud.
 2. Add the integration (Settings → Devices & Services → Add Integration →
    "Samsung EMDX e-paper"), enter host + PIN, and the MAC address if you want
    Wake-on-LAN.
-3. Push an image:
+3. Push an image — easiest via the bundled dashboard card: add a
+   `custom:emdx-push-card` card (plus a JavaScript resource pointing at
+   `/emdx/card.js`) with an `entity:` of your panel switch; click it, pick
+   an image, and it is downscaled in the browser, uploaded to
+   `/api/emdx/upload` and pushed. Each upload replaces the previous one.
+   Or call the service directly:
 
 ```yaml
 service: emdx.push_image
@@ -41,5 +46,7 @@ target:
   reserved for ~30–60 s; the integration retries connects automatically.
 - In deep sleep with network standby off the panel is completely invisible on
   the network — entities go unavailable; use `emdx.wake` (needs MAC).
-- The content server listens on TCP 3000 by default (one pending push,
-  guarded by a random token, 10 min TTL).
+- Content is served by HA itself on port 8123 under
+  `/emdx/c/<token>/content.json` + `/image` (one push per token). The newest
+  push stays fetchable indefinitely — the display re-fetches its content URL
+  later, and a 404 makes it show "Configuration error".
