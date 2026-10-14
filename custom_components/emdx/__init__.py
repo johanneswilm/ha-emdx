@@ -205,13 +205,14 @@ def _register_services(hass: HomeAssistant) -> None:
             )
 
     async def _sleep_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Power off but keep the network standby listener: WoL can wake it."""
         device: MdcDevice = entry.runtime_data["device"]
         coordinator: EmdxCoordinator = entry.runtime_data["coordinator"]
         async with coordinator.lock:
             try:
                 await device.connect(attempts=1)
                 try:
-                    await device.set_network_standby(False)
+                    await device.set_network_standby(True)
                     await device.set_power(False)
                 finally:
                     await device.disconnect()

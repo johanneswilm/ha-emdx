@@ -55,8 +55,9 @@ wake:
 sleep:
   name: Sleep display
   description: >
-    Put the panel into true deep sleep: network standby off + power off.
-    Only Wake-on-LAN can bring it back.
+    Power the panel off but keep network standby on, so it stays reachable
+    for Wake-on-LAN. Use the "Deep sleep" switch for full power-down
+    (wakeable only via the physical button).
   fields:
     target:
       required: true

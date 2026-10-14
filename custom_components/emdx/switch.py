@@ -98,8 +98,10 @@ class EmdxNetworkStandbySwitch(_SessionSwitch):
 class EmdxDeepSleepSwitch(_SessionSwitch):
     """True deep sleep: network standby off + panel power off.
 
-    On = sleeping and unreachable (wake with Wake-on-LAN / turning off).
-    Off = network standby enabled and panel powered.
+    On = sleeping and unreachable: Wake-on-LAN does NOT work with the
+    standby listener off; wake needs the physical button (or an on-timer).
+    Off = network standby enabled and panel powered (WoL attempted first,
+    harmless when the panel is already awake).
     """
 
     _attr_translation_key = "deep_sleep"
