@@ -7,10 +7,12 @@ replaces the previous) and push them through the normal push_image service.
 """
 from __future__ import annotations
 
+import io
 import logging
 from pathlib import Path
 
 from aiohttp import web
+from PIL import Image
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -48,10 +50,13 @@ class UploadView(HomeAssistantView):
         )
         if entry is None or entry.domain != DOMAIN:
             return self.json_message(f"{entity_id} is not an EMDX entity", 400)
-
         body = await request.read()
         if not body:
             return self.json_message("Empty upload", 400)
+        try:
+            Image.open(io.BytesIO(body)).verify()
+        except Exception:
+            return self.json_message("Upload is not a readable image", 400)
 
         path = hass.config.path(UPLOAD_SUBDIR, UPLOAD_NAME)
 
