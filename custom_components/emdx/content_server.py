@@ -33,6 +33,8 @@ class ContentServer:
         self._hass = hass
         self._pending: dict[str, dict] = {}
 
+        self.request_count = 0
+
     def start(self) -> None:
         if self._hass.data[DOMAIN].get("views_registered"):
             return
@@ -79,6 +81,7 @@ class ContentServer:
             return False
 
     def get_pending(self, token: str) -> dict | None:
+        self.request_count += 1
         entry = self._pending.get(token)
         if entry is None or entry["expires"] <= time.monotonic():
             return None

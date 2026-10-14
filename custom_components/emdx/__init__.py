@@ -170,6 +170,7 @@ def _register_services(hass: HomeAssistant) -> None:
         server.commit(content_url, build_manifest(image_url, len(jpeg)))
 
         _LOGGER.info("Pushing image: display will fetch %s", content_url)
+        requests_before = server.request_count
         async with coordinator.lock:
             try:
                 await device.connect()
@@ -187,8 +188,9 @@ def _register_services(hass: HomeAssistant) -> None:
         fetched = await server.wait_fetched(content_url, timeout=60)
         if not fetched:
             raise HomeAssistantError(
-                "Display did not fetch the image — check it is powered and on "
-                "the same network (or wake it first)."
+                f"Display did not fetch the image (content endpoint saw "
+                f"{server.request_count - requests_before} requests) — check "
+                "it is powered and on the same network (or wake it first)."
             )
         _LOGGER.info("Pushed image to %s", entry.title)
 
