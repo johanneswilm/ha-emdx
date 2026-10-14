@@ -7,7 +7,6 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_MAC, CONF_PIN
-from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
 from .const import CONF_CONTENT_PORT, DEFAULT_CONTENT_PORT, DOMAIN
@@ -68,9 +67,8 @@ class EmdxConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
-    @callback
-    def _async_set_unique_id_and_abort(self, host: str, serial: str) -> None:
-        self._async_set_unique_id(serial)
+    async def _async_set_unique_id_and_abort(self, host: str, serial: str) -> None:
+        await self.async_set_unique_id(serial)
         self._async_abort_entries_match({CONF_HOST: host})
 
     async def async_step_reauth(
