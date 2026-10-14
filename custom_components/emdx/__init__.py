@@ -165,7 +165,7 @@ def _register_services(hass: HomeAssistant) -> None:
             data.get("quality", 90),
         )
 
-        local_ip = network.async_get_source_ip(hass, entry.data[CONF_HOST])
+        local_ip = await network.async_get_source_ip(hass, entry.data[CONF_HOST])
         content_url = server.stage(
             jpeg, local_ip, hass.http.server_port, data.get("token")
         )
