@@ -43,9 +43,7 @@ class ContentServer:
         self._hass.http.register_view(_ImageView(self))
         self._hass.data[DOMAIN]["views_registered"] = True
 
-    def stage(
-        self, image: bytes, host: str, port: int, token: str | None = None
-    ) -> str:
+    def stage(self, image: bytes, host: str, port: int) -> str:
         """Stage one push; returns the content.json URL to hand the display."""
         now = time.monotonic()
         self._pending = {
@@ -53,7 +51,7 @@ class ContentServer:
             for token, entry in self._pending.items()
             if entry["expires"] > now
         }
-        token = token or secrets.token_urlsafe(16)
+        token = secrets.token_urlsafe(16)
         base = f"http://{host}:{port}{URL_PREFIX}{token}"
         self.last_content_url = f"{base}/content.json"
         self._pending[token] = {
