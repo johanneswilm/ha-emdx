@@ -60,7 +60,7 @@ class EmdxCoordinator(DataUpdateCoordinator[dict]):
             except MdcAuthError as err:
                 self.auth_failed = True
                 raise ConfigEntryAuthFailed(f"PIN rejected by display: {err}") from err
-            except MdcConnectionError as err:
+            except MdcConnectionError:
                 # Display is likely in deep sleep (network standby off):
                 # unreachable is a normal state, not an error.
                 self.auth_failed = False
