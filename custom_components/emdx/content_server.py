@@ -78,13 +78,13 @@ class ContentServer:
         if not self._valid(request.match_info["token"]) or self._pending["manifest"] is None:
             return web.Response(status=403)
         body = json.dumps(self._pending["manifest"]).replace("/", "\\/")
-        _LOGGER.debug("EMDX fetched content.json")
+        _LOGGER.info("EMDX fetched content.json")
         return web.Response(text=body, content_type="application/json")
 
     async def _handle_image(self, request: web.Request) -> web.Response:
         if not self._valid(request.match_info["token"]):
             return web.Response(status=403)
-        _LOGGER.debug("EMDX fetched image (%d bytes)", len(self._pending["image"]))
+        _LOGGER.info("EMDX fetched image (%d bytes)", len(self._pending["image"]))
         self._loop.call_soon(self._fetched.set)
         return web.Response(
             body=self._pending["image"], content_type="image/jpeg"

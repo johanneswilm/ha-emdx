@@ -14,6 +14,12 @@ import ssl
 
 _logger = logging.getLogger(__name__)
 
+# Built at import time: load_default_certs() is a blocking call and must not
+# run on the event loop (HA 2026 detects it).
+_SSL_CONTEXT = ssl.create_default_context()
+_SSL_CONTEXT.check_hostname = False
+_SSL_CONTEXT.verify_mode = ssl.CERT_NONE
+
 HEADER = 0xAA
 ACK = 0x41
 NAK = 0x4E
@@ -85,9 +91,7 @@ class MdcDevice:
             if greeting != b"MDCSTART<<TLS>>":
                 raise MdcConnectionError(f"unexpected greeting: {greeting!r}")
 
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            ctx = _SSL_CONTEXT
             # Upgrade the same socket: the display serves a single session and
             # a second TCP connection would be refused/ignored.
             await writer.start_tls(ctx)

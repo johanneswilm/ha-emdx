@@ -176,6 +176,7 @@ def _register_services(hass: HomeAssistant) -> None:
         commit_manifest = build_manifest(image_url, len(jpeg))
         server.commit(commit_manifest)
 
+        _LOGGER.info("Pushing image: display will fetch %s", content_url)
         async with coordinator.lock:
             try:
                 await device.connect()
