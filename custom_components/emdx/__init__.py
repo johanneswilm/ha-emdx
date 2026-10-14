@@ -171,10 +171,9 @@ def _register_services(hass: HomeAssistant) -> None:
         )
 
         local_ip = network.async_get_source_ip(hass, entry.data[CONF_HOST])
-        content_url = server.set_content({}, jpeg, local_ip)
-        image_url = content_url.replace("/content.json", "/image")
-        manifest = build_manifest(image_url, len(jpeg))
-        content_url = server.set_content(manifest, jpeg, local_ip)
+        content_url, image_url = server.stage(jpeg, local_ip)
+        commit_manifest = build_manifest(image_url, len(jpeg))
+        server.commit(commit_manifest)
 
         async with coordinator.lock:
             try:

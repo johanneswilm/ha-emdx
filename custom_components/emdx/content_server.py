@@ -43,16 +43,22 @@ class ContentServer:
             await self._runner.cleanup()
             self._runner = None
 
-    def set_content(self, manifest: dict, image: bytes, host: str) -> str:
-        """Stage one push; returns the content.json URL to hand to the display."""
+    def stage(self, image: bytes, host: str) -> tuple[str, str]:
+        """Stage one push; returns (content_url, image_url) sharing one token."""
         self.token = secrets.token_urlsafe(16)
+        base = f"http://{host}:{self.port}/c/{self.token}"
         self._pending = {
-            "manifest": manifest,
+            "manifest": None,
             "image": image,
             "expires": time.monotonic() + CONTENT_TTL,
         }
         self._fetched.clear()
-        return f"http://{host}:{self.port}/c/{self.token}/content.json"
+        return f"{base}/content.json", f"{base}/image"
+
+    def commit(self, manifest: dict) -> None:
+        """Attach the manifest that references the staged image URL."""
+        if self._pending is not None:
+            self._pending["manifest"] = manifest
 
     async def wait_fetched(self, timeout: float) -> bool:
         try:
@@ -69,7 +75,7 @@ class ContentServer:
         )
 
     async def _handle_manifest(self, request: web.Request) -> web.Response:
-        if not self._valid(request.match_info["token"]):
+        if not self._valid(request.match_info["token"]) or self._pending["manifest"] is None:
             return web.Response(status=403)
         body = json.dumps(self._pending["manifest"]).replace("/", "\\/")
         _LOGGER.debug("EMDX fetched content.json")
