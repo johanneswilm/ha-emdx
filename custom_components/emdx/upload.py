@@ -8,6 +8,7 @@ replaces the previous) and push them through the normal push_image service.
 from __future__ import annotations
 
 import io
+import json
 import logging
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CARD_FILE = Path(__file__).parent / "push_card.js"
+MANIFEST = Path(__file__).parent / "manifest.json"
 UPLOAD_SUBDIR = "emdx"
 UPLOAD_NAME = "last_upload.jpg"
 
@@ -92,6 +94,15 @@ class CardView(HomeAssistantView):
             content_type="text/javascript",
             headers={"Cache-Control": "no-cache"},
         )
+
+
+def card_url(hass: HomeAssistant) -> str:
+    """Card URL with a version query so browsers refetch after upgrades."""
+    try:
+        version = json.loads(MANIFEST.read_text(encoding="utf-8"))["version"]
+    except Exception:
+        version = "dev"
+    return f"/emdx/card.js?v={version}"
 
 
 def register_views(hass: HomeAssistant) -> None:
