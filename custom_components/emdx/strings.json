@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Samsung EMDX e-paper display",
+        "description": "The display must already be on your WiFi. The PIN is shown on the display / in its settings menu.",
+        "data": {
+          "host": "IP address",
+          "pin": "PIN",
+          "mac": "MAC address (optional, needed for Wake-on-LAN)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate display",
+        "description": "The display rejected the stored PIN. Enter the current PIN.",
+        "data": { "pin": "PIN" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the display (is it asleep or on another network?)",
+      "invalid_auth": "Wrong PIN"
+    },
+    "abort": {
+      "already_configured": "This display is already configured."
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": { "name": "Panel power" },
+      "network_standby": { "name": "Network standby" },
+      "deep_sleep": { "name": "Deep sleep" }
+    },
+    "sensor": {
+      "battery": { "name": "Battery" },
+      "firmware": { "name": "Firmware" }
+    }
+  }
+}

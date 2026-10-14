@@ -1,0 +1,20 @@
+{
+  "services": {
+    "push_image": {
+      "icon": "mdi:image"
+    },
+    "wake": {
+      "icon": "mdi:wake"
+    },
+    "sleep": {
+      "icon": "mdi:power-sleep"
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": { "icon": "mdi:power" },
+      "network_standby": { "icon": "mdi:wifi" },
+      "deep_sleep": { "icon": "mdi:power-sleep" }
+    }
+  }
+}

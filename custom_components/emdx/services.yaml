@@ -1,0 +1,72 @@
+push_image:
+  name: Push image
+  description: >
+    Push an image to the EMDX e-paper panel. The panel fetches the image from
+    Home Assistant over the local network, so it must be powered and reachable.
+  fields:
+    target:
+      required: true
+      selector:
+        target:
+          entity:
+            integration: emdx
+          config_entry:
+            integration: emdx
+    image:
+      required: false
+      example: /media/some_image.jpg
+      selector:
+        text:
+    url:
+      required: false
+      example: http://192.168.50.50/picture.jpg
+      selector:
+        text:
+    camera_entity:
+      required: false
+      selector:
+        entity:
+          domain: camera
+    resize:
+      default: true
+      selector:
+        boolean:
+    quality:
+      default: 90
+      selector:
+        number:
+          min: 30
+          max: 100
+    sleep_after:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 1440
+          unit_of_measurement: minutes
+wake:
+  name: Wake display
+  description: Send Wake-on-LAN to a sleeping EMDX panel (needs MAC + network standby).
+  fields:
+    target:
+      required: true
+      selector:
+        target:
+          entity:
+            integration: emdx
+          config_entry:
+            integration: emdx
+sleep:
+  name: Sleep display
+  description: >
+    Put the panel into true deep sleep: network standby off + power off.
+    Only Wake-on-LAN can bring it back.
+  fields:
+    target:
+      required: true
+      selector:
+        target:
+          entity:
+            integration: emdx
+          config_entry:
+            integration: emdx
