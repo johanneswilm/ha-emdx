@@ -228,7 +228,7 @@ def _register_services(hass: HomeAssistant) -> None:
             mac = entry.data.get(CONF_MAC)
             if not mac:
                 raise HomeAssistantError("wake requires a MAC address in the entry")
-            await send_wol(mac)
+            await send_wol(mac, entry.data[CONF_HOST])
             _LOGGER.info("Sent Wake-on-LAN to %s", entry.title)
 
     async def handle_sleep(call: ServiceCall) -> None:

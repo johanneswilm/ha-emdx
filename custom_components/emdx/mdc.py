@@ -234,18 +234,27 @@ def wol_magic_packet(mac: str) -> bytes:
     return b"\xff" * 6 + raw * 16
 
 
-async def send_wol(mac: str) -> None:
+async def send_wol(mac: str, target_ip: str | None = None) -> None:
+    """Magic packet to the limited broadcast and, when known, the /24 directed
+    broadcast: HAOS/wired hosts' 255.255.255.255 may not reach WLAN clients."""
     packet = wol_magic_packet(mac)
     loop = asyncio.get_running_loop()
-    sock = await loop.create_datagram_endpoint(
-        lambda: asyncio.DatagramProtocol(),
-        remote_addr=("255.255.255.255", 9),
-        allow_broadcast=True,
-    )
-    transport = sock[0]
-    try:
-        for _ in range(3):
-            transport.sendto(packet)
-            await asyncio.sleep(0.2)
-    finally:
-        transport.close()
+    addrs = ["255.255.255.255"]
+    if target_ip:
+        parts = target_ip.split(".")
+        if len(parts) == 4:
+            directed = ".".join(parts[:3]) + ".255"
+            if directed != "255.255.255.255":
+                addrs.append(directed)
+    for addr in addrs:
+        transport, _ = await loop.create_datagram_endpoint(
+            lambda: asyncio.DatagramProtocol(),
+            remote_addr=(addr, 9),
+            allow_broadcast=True,
+        )
+        try:
+            for _ in range(3):
+                transport.sendto(packet)
+                await asyncio.sleep(0.2)
+        finally:
+            transport.close()

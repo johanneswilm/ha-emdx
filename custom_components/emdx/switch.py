@@ -137,7 +137,7 @@ class EmdxDeepSleepSwitch(_SessionSwitch):
                 "Wake requires the MAC address; edit this integration entry to add it."
             )
         try:
-            await send_wol(mac)
+            await send_wol(mac, self._entry.data.get("host"))
         except OSError as err:
             raise HomeAssistantError(f"Wake-on-LAN failed: {err}") from err
         await asyncio.sleep(5)
