@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .mdc import MdcAuthError, MdcConnectionError, MdcDevice, MdcError
 _LOGGER = logging.getLogger(__name__)
 
 POLL_INTERVAL = timedelta(minutes=15)

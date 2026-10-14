@@ -10,8 +10,6 @@ push_image:
         target:
           entity:
             integration: emdx
-          config_entry:
-            integration: emdx
     image:
       required: false
       example: /media/some_image.jpg
@@ -54,8 +52,6 @@ wake:
         target:
           entity:
             integration: emdx
-          config_entry:
-            integration: emdx
 sleep:
   name: Sleep display
   description: >
@@ -67,6 +63,4 @@ sleep:
       selector:
         target:
           entity:
-            integration: emdx
-          config_entry:
             integration: emdx

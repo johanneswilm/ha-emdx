@@ -38,6 +38,9 @@ class EmdxBatterySensor(EmdxEntity, SensorEntity):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_attribution = "MDC 0x1B/0x73"
 
+    def __init__(self, entry, coordinator) -> None:
+        super().__init__(entry, coordinator, self._attr_translation_key)
+
     @property
     def native_value(self) -> StateType:
         battery = (self._coordinator.data or {}).get("battery")
@@ -58,6 +61,9 @@ class EmdxBatterySensor(EmdxEntity, SensorEntity):
 class EmdxFirmwareSensor(EmdxEntity, SensorEntity):
     _attr_translation_key = "firmware"
     _attr_entity_registry_enabled_default = False
+
+    def __init__(self, entry, coordinator) -> None:
+        super().__init__(entry, coordinator, self._attr_translation_key)
 
     @property
     def native_value(self) -> StateType:

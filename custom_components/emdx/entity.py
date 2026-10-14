@@ -11,9 +11,16 @@ from .coordinator import EmdxCoordinator
 class EmdxEntity:
     """Mixin providing the device entry shared by all entities of one panel."""
 
-    def __init__(self, entry: ConfigEntry, coordinator: EmdxCoordinator) -> None:
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        coordinator: EmdxCoordinator,
+        key: str | None = None,
+    ) -> None:
         self._entry = entry
         self._coordinator = coordinator
+        if key:
+            self._attr_unique_id = f"{entry.unique_id or entry.entry_id}-{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.unique_id or entry.entry_id)},
             name=entry.title,
@@ -29,6 +36,4 @@ class EmdxEntity:
     @property
     def available(self) -> bool:
         # Unreachable == deep sleep with network standby off; that is normal.
-        return bool(self._coordinator.last_successful_update is not None) and bool(
-            (self._coordinator.data or {}).get("available", False)
-        )
+        return bool((self._coordinator.data or {}).get("available", False))

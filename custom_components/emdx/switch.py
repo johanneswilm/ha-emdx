@@ -24,12 +24,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: EmdxCoordinator = entry.runtime_data["coordinator"]
-    device = entry.runtime_data["device"]
     async_add_entities(
         [
-            EmdxPowerSwitch(entry, coordinator, device),
-            EmdxNetworkStandbySwitch(entry, coordinator, device),
-            EmdxDeepSleepSwitch(entry, coordinator, device),
+            EmdxPowerSwitch(entry, coordinator),
+            EmdxNetworkStandbySwitch(entry, coordinator),
+            EmdxDeepSleepSwitch(entry, coordinator),
         ]
     )
 
@@ -40,7 +39,7 @@ class _SessionSwitch(EmdxEntity, SwitchEntity):
     _attr_has_entity_name = True
 
     def __init__(self, entry: ConfigEntry, coordinator: EmdxCoordinator) -> None:
-        super().__init__(entry, coordinator)
+        super().__init__(entry, coordinator, self._attr_translation_key)
         self._device = entry.runtime_data["device"]
 
     async def _session_command(self, coro_name: str, *args) -> None:
