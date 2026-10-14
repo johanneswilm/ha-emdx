@@ -35,9 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
 
 _TARGET = TargetSelector(
-    TargetSelectorConfig(
-        entity={"domain": DOMAIN}, config_entry={"domain": DOMAIN}
-    )
+    TargetSelectorConfig(entity={"integration": DOMAIN})
 )
 
 PUSH_IMAGE_SCHEMA = vol.Schema(
