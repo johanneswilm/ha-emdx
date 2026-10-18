@@ -1,5 +1,6 @@
 // Lovelace card: pick an image, downscale it in the browser, upload and
 // push it to a Samsung EMDX e-paper panel. Each upload replaces the last.
+// Shows a scaled preview of the last upload (GET /api/emdx/preview, authed).
 //
 // Defensive: setConfig never throws (a missing/renamed entity shows an
 // in-card message instead of Lovelace's "Config error" card), and the
@@ -21,10 +22,14 @@ class EmdxPushCard extends HTMLElement {
     if (!this._root) {
       this._build();
     }
+    if (this._config.preview !== false && !this._previewRequested) {
+      this._previewRequested = true;
+      this._loadPreview();
+    }
   }
 
   getCardSize() {
-    return 4;
+    return this._config.preview === false ? 4 : 6;
   }
 
   _setStatus(text, error) {
@@ -40,6 +45,26 @@ class EmdxPushCard extends HTMLElement {
     card.header = this._config.title || "Push image to panel";
     const body = document.createElement("div");
     body.style.padding = "16px";
+
+    if (this._config.preview !== false) {
+      const prev = document.createElement("div");
+      prev.style.cssText =
+        "display:none;margin:0 0 12px;text-align:center;";
+      const img = document.createElement("img");
+      img.alt = "Last uploaded image";
+      img.style.cssText =
+        "display:block;margin:0 auto;max-width:256px;max-height:160px;" +
+        "width:100%;height:auto;border-radius:6px;";
+      const cap = document.createElement("div");
+      cap.textContent = "last upload";
+      cap.style.cssText =
+        "font-size:0.75rem;color:var(--secondary-text-color);margin-top:4px;";
+      prev.appendChild(img);
+      prev.appendChild(cap);
+      body.appendChild(prev);
+      this._preview = prev;
+      this._previewImg = img;
+    }
 
     const drop = document.createElement("div");
     drop.style.cssText =
@@ -68,6 +93,29 @@ class EmdxPushCard extends HTMLElement {
     this._status = status;
   }
 
+  async _loadPreview() {
+    if (!this._hass || !this._preview) {
+      return;
+    }
+    try {
+      const resp = await this._hass.fetchWithAuth("/api/emdx/preview", {
+        cache: "no-store",
+      });
+      if (!resp.ok) {
+        return;
+      }
+      const blob = await resp.blob();
+      if (this._previewUrl) {
+        URL.revokeObjectURL(this._previewUrl);
+      }
+      this._previewUrl = URL.createObjectURL(blob);
+      this._previewImg.src = this._previewUrl;
+      this._preview.style.display = "block";
+    } catch (err) {
+      // No last upload yet, or offline: keep the preview hidden.
+    }
+  }
+
   async _upload(file, status) {
     if (!file) {
       return;
@@ -91,8 +139,11 @@ class EmdxPushCard extends HTMLElement {
       const data = await resp.json().catch(() => null);
       if (resp.ok && data) {
         this._setStatus(`Pushed ${(blob.size / 1024).toFixed(0)} kB ✓`);
+        this._loadPreview();
       } else {
         this._setStatus((data && data.message) || `Error ${resp.status}`, true);
+        // The upload view stores the file even when the push itself failed.
+        this._loadPreview();
       }
     } catch (err) {
       this._setStatus(`Failed: ${err}`, true);

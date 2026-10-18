@@ -203,7 +203,10 @@ class MdcDevice:
         return (await self.command(CMD_DEVICE_NAME)).decode(errors="replace")
 
     async def get_network_standby(self) -> bool:
-        return (await self.command(CMD_NETWORK_STANDBY))[0] == 0x01
+        r = await self.command(CMD_NETWORK_STANDBY)
+        if not r:
+            raise MdcError("empty network standby response")
+        return r[0] == 0x01
 
     async def set_network_standby(self, enabled: bool) -> None:
         await self.command(CMD_NETWORK_STANDBY, bytes([0x01 if enabled else 0x00]))
@@ -214,6 +217,8 @@ class MdcDevice:
     async def get_battery(self) -> dict:
         r = await self.command(CMD_STATUS, bytes([0x73]))
         # r = [0x73, charging, present, healthy, level, ...]
+        if len(r) < 5 or r[0] != 0x73:
+            raise MdcError(f"unexpected battery response: {r!r}")
         return {
             "charging": r[1] == 0x01,
             "present": r[2] == 0x01,

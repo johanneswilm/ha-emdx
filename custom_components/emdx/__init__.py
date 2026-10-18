@@ -233,6 +233,7 @@ def _register_services(hass: HomeAssistant) -> None:
                     await device.disconnect()
             except MdcError as err:
                 _LOGGER.warning("Auto-sleep failed for %s: %s", entry.title, err)
+        await coordinator.async_request_refresh()
 
     async def handle_push_image(call: ServiceCall) -> None:
         for entry in await _resolve_entries(call):
@@ -245,6 +246,11 @@ def _register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError("wake requires a MAC address in the entry")
             await send_wol(mac, entry.data[CONF_HOST])
             _LOGGER.info("Sent Wake-on-LAN to %s", entry.title)
+            # The panel boots in ~10 s; flip availability back without waiting
+            # for the next interval poll.
+            coordinator: EmdxCoordinator = entry.runtime_data["coordinator"]
+            await asyncio.sleep(15)
+            await coordinator.async_request_refresh()
 
     async def handle_sleep(call: ServiceCall) -> None:
         for entry in await _resolve_entries(call):

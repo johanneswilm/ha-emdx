@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 
 from aiohttp import web
-from PIL import Image
+from PIL import Image, ImageOps
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -27,6 +27,25 @@ CARD_FILE = Path(__file__).parent / "push_card.js"
 MANIFEST = Path(__file__).parent / "manifest.json"
 UPLOAD_SUBDIR = "emdx"
 UPLOAD_NAME = "last_upload.jpg"
+
+# Read the version at import (module imports run off the event loop): reading
+# it inside async_setup_entry trips HA's blocking-call detection.
+try:
+    VERSION = json.loads(MANIFEST.read_text(encoding="utf-8"))["version"]
+except Exception:
+    VERSION = "dev"
+
+PREVIEW_GEN_W = 512  # preview render width: card shows <=256 px, crisp on HiDPI
+
+
+def _preview_jpeg(raw: bytes) -> bytes:
+    img = Image.open(io.BytesIO(raw))
+    img = ImageOps.exif_transpose(img)
+    img.thumbnail((PREVIEW_GEN_W, PREVIEW_GEN_W), Image.LANCZOS)
+    img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, "JPEG", quality=82, optimize=True)
+    return out.getvalue()
 
 
 class UploadView(HomeAssistantView):
@@ -88,21 +107,51 @@ class CardView(HomeAssistantView):
     name = "api:emdx:card"
     requires_auth = False
 
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+
     async def get(self, request: web.Request) -> web.Response:
+        text = await self._hass.async_add_executor_job(
+            CARD_FILE.read_text, "utf-8"
+        )
         return web.Response(
-            text=CARD_FILE.read_text(encoding="utf-8"),
+            text=text,
             content_type="text/javascript",
             headers={"Cache-Control": "no-cache"},
         )
 
 
+class PreviewView(HomeAssistantView):
+    """GET a scaled preview of the last uploaded image (auth required).
+
+    Thumbnails on the fly, so there is no second file to keep in sync; the
+    source is a few hundred kB at most and this is a once-per-view cost.
+    """
+
+    url = "/api/emdx/preview"
+    name = "api:emdx:preview"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        path = Path(self._hass.config.path(UPLOAD_SUBDIR, UPLOAD_NAME))
+        try:
+            raw = await self._hass.async_add_executor_job(path.read_bytes)
+            thumb = await self._hass.async_add_executor_job(_preview_jpeg, raw)
+        except (OSError, ValueError):
+            return web.Response(status=404)
+        return web.Response(
+            body=thumb,
+            content_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+
+
 def card_url(hass: HomeAssistant) -> str:
     """Card URL with a version query so browsers refetch after upgrades."""
-    try:
-        version = json.loads(MANIFEST.read_text(encoding="utf-8"))["version"]
-    except Exception:
-        version = "dev"
-    return f"/emdx/card.js?v={version}"
+    return f"/emdx/card.js?v={VERSION}"
 
 
 async def ensure_card_resource(hass: HomeAssistant) -> None:
@@ -146,5 +195,6 @@ def register_views(hass: HomeAssistant) -> None:
     if hass.data[DOMAIN].get("web_ui_registered"):
         return
     hass.http.register_view(UploadView(hass))
-    hass.http.register_view(CardView())
+    hass.http.register_view(CardView(hass))
+    hass.http.register_view(PreviewView(hass))
     hass.data[DOMAIN]["web_ui_registered"] = True

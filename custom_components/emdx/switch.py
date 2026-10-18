@@ -109,10 +109,11 @@ class EmdxDeepSleepSwitch(_SessionSwitch):
 
     @property
     def is_on(self) -> bool | None:
-        standby = (self._coordinator.data or {}).get("network_standby")
+        data = self._coordinator.data or {}
+        standby = data.get("network_standby")
         if standby is None:
-            # Unreachable: assume it is sleeping if we could not reach it.
-            return None
+            # Unreachable: a silent panel only gets that way via deep sleep.
+            return True if data.get("available") is False else None
         return not standby
 
     async def async_turn_on(self, **kwargs) -> None:
