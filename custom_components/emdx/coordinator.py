@@ -35,7 +35,12 @@ class EmdxCoordinator(DataUpdateCoordinator[dict]):
 
     def async_add_listener(self, update_callback, context=None):
         """Wrap add/remove listener with diagnostic logs (temporary)."""
-        unsub = super().async_add_listener(update_callback, context)
+
+        def _diag_cb() -> None:
+            _LOGGER.warning("emdx diag: listener fired")
+            update_callback()
+
+        unsub = super().async_add_listener(_diag_cb, context)
         _LOGGER.warning(
             "emdx diag: listener added (total=%d)", len(self._listeners)
         )
@@ -47,6 +52,18 @@ class EmdxCoordinator(DataUpdateCoordinator[dict]):
             )
 
         return _unsub
+
+    def schedule_late_refresh(self, delay: float = 45.0) -> None:
+        """Re-check state after a power change.
+
+        The display keeps serving its last (now dead) session and closes the
+        MDC port ~30-60 s later, so the immediate post-sleep refresh races
+        the shutdown.
+        """
+        self.hass.loop.call_later(
+            delay,
+            lambda: self.hass.async_create_task(self.async_request_refresh()),
+        )
 
     async def _async_update_data(self) -> dict:
         _LOGGER.warning("emdx diag: update requested (device lock busy=%s)", self.lock.locked())

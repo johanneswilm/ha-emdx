@@ -234,6 +234,7 @@ def _register_services(hass: HomeAssistant) -> None:
             except MdcError as err:
                 _LOGGER.warning("Auto-sleep failed for %s: %s", entry.title, err)
         await coordinator.async_request_refresh()
+        coordinator.schedule_late_refresh()
 
     async def handle_push_image(call: ServiceCall) -> None:
         for entry in await _resolve_entries(call):
@@ -251,6 +252,7 @@ def _register_services(hass: HomeAssistant) -> None:
             coordinator: EmdxCoordinator = entry.runtime_data["coordinator"]
             await asyncio.sleep(15)
             await coordinator.async_request_refresh()
+            coordinator.schedule_late_refresh(60)
 
     async def handle_sleep(call: ServiceCall) -> None:
         for entry in await _resolve_entries(call):

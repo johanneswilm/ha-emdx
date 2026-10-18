@@ -68,11 +68,13 @@ class EmdxPowerSwitch(_SessionSwitch):
         await self._session_command("set_power", True)
         self._attr_is_on = True
         self.async_write_ha_state()
+        self._coordinator.schedule_late_refresh(20)
 
     async def async_turn_off(self, **kwargs) -> None:
         await self._session_command("set_power", False)
         self._attr_is_on = False
         self.async_write_ha_state()
+        self._coordinator.schedule_late_refresh(45)
 
 
 class EmdxNetworkStandbySwitch(_SessionSwitch):
@@ -129,6 +131,7 @@ class EmdxDeepSleepSwitch(_SessionSwitch):
             except MdcError as err:
                 raise HomeAssistantError(f"{self.name}: {err}") from err
         await self._coordinator.async_request_refresh()
+        self._coordinator.schedule_late_refresh(60)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Wake up: WoL, then re-enable network standby and power on."""
@@ -153,3 +156,4 @@ class EmdxDeepSleepSwitch(_SessionSwitch):
             except MdcError as err:
                 raise HomeAssistantError(f"{self.name}: {err}") from err
         await self._coordinator.async_request_refresh()
+        self._coordinator.schedule_late_refresh(30)
