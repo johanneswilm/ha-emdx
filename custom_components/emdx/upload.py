@@ -168,11 +168,7 @@ async def ensure_card_resource(hass: HomeAssistant) -> None:
     else:
         resources = getattr(lovelace_data, "resources", None)
     if resources is None:
-        _LOGGER.warning(
-            "emdx diag: lovelace not set up (hass.data['lovelace']=%r); "
-            "push card unavailable",
-            hass.data.get("lovelace"),
-        )
+        _LOGGER.warning("%s: lovelace not set up; push card unavailable", DOMAIN)
         return
     if not hasattr(resources, "async_create_item"):
         # YAML-managed resources (lovelace: resource_mode: yaml) — read-only.
@@ -190,12 +186,8 @@ async def ensure_card_resource(hass: HomeAssistant) -> None:
         if item["url"].split("?", 1)[0] != path:
             continue
         if item["url"] != url:
-            _LOGGER.warning(
-                "emdx diag: updating card resource %r -> %r", item["url"], url
-            )
             await resources.async_update_item(item["id"], {"url": url})
         return
-    _LOGGER.warning("emdx diag: creating card resource %r", url)
     await resources.async_create_item({"res_type": "module", "url": url})
 
 
