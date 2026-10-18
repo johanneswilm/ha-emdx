@@ -33,7 +33,23 @@ class EmdxCoordinator(DataUpdateCoordinator[dict]):
         self.lock = asyncio.Lock()
         self.auth_failed = False
 
+    def async_add_listener(self, update_callback, context=None):
+        """Wrap add/remove listener with diagnostic logs (temporary)."""
+        unsub = super().async_add_listener(update_callback, context)
+        _LOGGER.warning(
+            "emdx diag: listener added (total=%d)", len(self._listeners)
+        )
+
+        def _unsub() -> None:
+            unsub()
+            _LOGGER.warning(
+                "emdx diag: listener removed (total=%d)", len(self._listeners)
+            )
+
+        return _unsub
+
     async def _async_update_data(self) -> dict:
+        _LOGGER.warning("emdx diag: update requested (device lock busy=%s)", self.lock.locked())
         async with self.lock:
             try:
                 await self.device.connect()
@@ -64,7 +80,9 @@ class EmdxCoordinator(DataUpdateCoordinator[dict]):
                 # Display is likely in deep sleep (network standby off):
                 # unreachable is a normal state, not an error.
                 self.auth_failed = False
+                _LOGGER.warning("emdx diag: update done: unreachable")
                 return {"available": False}
             self.auth_failed = False
             data["available"] = True
+            _LOGGER.warning("emdx diag: update done: %r", data)
             return data
